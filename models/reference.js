@@ -1,11 +1,32 @@
 const mongoose = require("mongoose");
 
-const schema = new mongoose.Schema({
-  firstname: String,
-  lastname: String,
-  email: String,
-  position: String,
-  company: String
+const referenceSchema = new mongoose.Schema({
+
+ firstname:{
+  type:String,
+  required:true
+ },
+
+ lastname:{
+  type:String,
+  required:true
+ },
+
+ email:{
+  type:String,
+  required:true
+ },
+
+ position:{
+  type:String,
+  required:true
+ },
+
+ company:{
+  type:String,
+  required:true
+ }
+
 });
 
-module.exports = mongoose.model("Reference", schema);
+module.exports = mongoose.model("Reference", referenceSchema);
