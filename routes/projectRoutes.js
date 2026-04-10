@@ -3,11 +3,12 @@ const router = express.Router();
 
 const controller =
 require("../controllers/projectController");
+const auth = require("../middleware/authMiddleware");
 
-router.post("/", controller.addProject);//add
+router.post("/", auth, controller.addProject);//add
 router.get("/:id", controller.getProjectById);//get by id
-router.put("/:id", controller.updateProject);//update
-router.delete("/:id", controller.deleteProject);//delete
+router.put("/:id", auth, controller.updateProject);//update
+router.delete("/:id", auth, controller.deleteProject);//delete
 router.get("/", controller.getProjects);//get all
 
 module.exports = router;

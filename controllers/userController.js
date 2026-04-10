@@ -1,74 +1,233 @@
 const User = require("../models/user");
+const jwt = require("jsonwebtoken");
+const bcrypt = require("bcryptjs");
 
-// ADD
-exports.addUser = async (req, res) => {
- const user = await User.create(req.body);
-
- res.json({
-  success: true,
-  message: "User added successfully.",
-  data: {
-   firstname: user.firstname,
-   lastname: user.lastname,
-   email: user.email,
-   password: user.password,
-   created: user.created,
-   updated: user.updated,
-   id: user._id
-  }
- });
+// create jwt token
+const generateToken = (user) => {
+  return jwt.sign(
+    {
+      userId: user._id,
+      email: user.email,
+    },
+    process.env.JWT_SECRET,
+    {
+      expiresIn: "7d",
+    }
+  );
 };
 
-// GET BY ID
-exports.getUserById = async (req, res) => {
- const user = await User.findById(req.params.id);
+// SIGN UP
+module.exports.signup = async function (req, res, next) {
+  try {
+    const { firstname, lastname, email, password } = req.body;
 
- res.json({
-  success: true,
-  message: "User retrieved successfully.",
-  data: {
-   firstname: user.firstname,
-   lastname: user.lastname,
-   email: user.email,
-   id: user._id
-  }
- });
-};
+    // simple validation
+    if (!firstname || !lastname || !email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: "Please fill in all required fields.",
+      });
+    }
 
-// UPDATE
-exports.updateUser = async (req, res) => {
- await User.findByIdAndUpdate(req.params.id, req.body);
+    // check if email already exists
+    let existingUser = await User.findOne({ email: email.toLowerCase() });
 
- res.json({
-  success: true,
-  message: "User updated successfully."
- });
-};
+    if (existingUser) {
+      return res.status(400).json({
+        success: false,
+        message: "User already exists.",
+      });
+    }
 
-// DELETE
-exports.deleteUser = async (req, res) => {
- await User.findByIdAndDelete(req.params.id);
-
- res.json({
-  success: true,
-  message: "User deleted successfully."
- });
-};
-
-// GET ALL
-exports.getUsers = async (req, res) => {
-    const users = await User.find();
-   
-    const data = users.map(u => ({
-     firstname: u.firstname,
-     lastname: u.lastname,
-     email: u.email,
-     id: u._id
-    }));
-   
-    res.json({
-     success: true,
-     message: "Users list retrieved successfully.",
-     data
+    // create user
+    let newUser = new User({
+      firstname,
+      lastname,
+      email: email.toLowerCase(),
+      password,
     });
-   };
+
+    await newUser.save();
+
+    res.status(201).json({
+      success: true,
+      message: "User created successfully.",
+      data: {
+        id: newUser._id,
+        firstname: newUser.firstname,
+        lastname: newUser.lastname,
+        email: newUser.email,
+        created: newUser.created,
+        updated: newUser.updated,
+      },
+    });
+  } catch (error) {
+    console.log(error);
+    next(error);
+  }
+};
+
+// SIGN IN
+module.exports.signin = async function (req, res, next) {
+  try {
+    const { email, password } = req.body;
+
+    if (!email || !password) {
+      return res.status(400).json({
+        success: false,
+        message: "Email and password are required.",
+      });
+    }
+
+    let user = await User.findOne({ email: email.toLowerCase() });
+
+    if (!user) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid email or password.",
+      });
+    }
+
+    // compare password
+    const isMatch = await user.comparePassword(password);
+
+    if (!isMatch) {
+      return res.status(401).json({
+        success: false,
+        message: "Invalid email or password.",
+      });
+    }
+
+    const token = generateToken(user);
+
+    res.status(200).json({
+      success: true,
+      message: "Sign in successful.",
+      token: token,
+      data: {
+        id: user._id,
+        firstname: user.firstname,
+        lastname: user.lastname,
+        email: user.email,
+        created: user.created,
+        updated: user.updated,
+      },
+    });
+  } catch (error) {
+    console.log(error);
+    next(error);
+  }
+};
+
+// GET ALL USERS
+module.exports.getUsers = async function (req, res, next) {
+  try {
+    let users = await User.find({}, "-password").sort({ created: -1 });
+
+    res.status(200).json({
+      success: true,
+      message: "Users retrieved successfully.",
+      data: users,
+    });
+  } catch (error) {
+    console.log(error);
+    next(error);
+  }
+};
+
+// GET USER BY ID
+module.exports.getUserById = async function (req, res, next) {
+  try {
+    let id = req.params.id;
+
+    let user = await User.findById(id).select("-password");
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found.",
+      });
+    }
+
+    res.status(200).json({
+      success: true,
+      message: "User retrieved successfully.",
+      data: user,
+    });
+  } catch (error) {
+    console.log(error);
+    next(error);
+  }
+};
+
+// UPDATE USER
+module.exports.updateUser = async function (req, res, next) {
+  try {
+    let id = req.params.id;
+    const { firstname, lastname, email, password } = req.body;
+
+    let user = await User.findById(id);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found.",
+      });
+    }
+
+    // update fields only if sent
+    if (firstname) user.firstname = firstname;
+    if (lastname) user.lastname = lastname;
+    if (email) user.email = email.toLowerCase();
+
+    // if password is updated, hash it manually
+    if (password) {
+      const salt = await bcrypt.genSalt(10);
+      user.password = await bcrypt.hash(password, salt);
+    }
+
+    await user.save();
+
+    res.status(200).json({
+      success: true,
+      message: "User updated successfully.",
+      data: {
+        id: user._id,
+        firstname: user.firstname,
+        lastname: user.lastname,
+        email: user.email,
+        created: user.created,
+        updated: user.updated,
+      },
+    });
+  } catch (error) {
+    console.log(error);
+    next(error);
+  }
+};
+
+// DELETE USER
+module.exports.deleteUser = async function (req, res, next) {
+  try {
+    let id = req.params.id;
+
+    let user = await User.findById(id);
+
+    if (!user) {
+      return res.status(404).json({
+        success: false,
+        message: "User not found.",
+      });
+    }
+
+    await User.findByIdAndDelete(id);
+
+    res.status(200).json({
+      success: true,
+      message: "User deleted successfully.",
+    });
+  } catch (error) {
+    console.log(error);
+    next(error);
+  }
+};
