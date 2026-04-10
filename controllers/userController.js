@@ -184,10 +184,7 @@ module.exports.updateUser = async function (req, res, next) {
     if (email) user.email = email.toLowerCase();
 
     // if password is updated, hash it manually
-    if (password) {
-      const salt = await bcrypt.genSalt(10);
-      user.password = await bcrypt.hash(password, salt);
-    }
+    if (password) user.password = password;
 
     await user.save();
 
