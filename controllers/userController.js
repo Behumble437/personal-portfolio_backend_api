@@ -17,11 +17,10 @@ const generateToken = (user) => {
 };
 
 // SIGN UP
-module.exports.signup = async function (req, res, next) {
+module.exports.signup = async function (req, res) {
   try {
     const { firstname, lastname, email, password } = req.body;
 
-    // simple validation
     if (!firstname || !lastname || !email || !password) {
       return res.status(400).json({
         success: false,
@@ -29,8 +28,7 @@ module.exports.signup = async function (req, res, next) {
       });
     }
 
-    // check if email already exists
-    let existingUser = await User.findOne({ email: email.toLowerCase() });
+    const existingUser = await User.findOne({ email: email.toLowerCase() });
 
     if (existingUser) {
       return res.status(400).json({
@@ -39,8 +37,7 @@ module.exports.signup = async function (req, res, next) {
       });
     }
 
-    // create user
-    let newUser = new User({
+    const newUser = new User({
       firstname,
       lastname,
       email: email.toLowerCase(),
@@ -49,7 +46,7 @@ module.exports.signup = async function (req, res, next) {
 
     await newUser.save();
 
-    res.status(201).json({
+    return res.status(201).json({
       success: true,
       message: "User created successfully.",
       data: {
@@ -62,13 +59,17 @@ module.exports.signup = async function (req, res, next) {
       },
     });
   } catch (error) {
-    console.log(error);
-    next(error);
+    console.log("Signup error:", error);
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
   }
 };
 
+
 // SIGN IN
-module.exports.signin = async function (req, res, next) {
+module.exports.signin = async function (req, res) {
   try {
     const { email, password } = req.body;
 
@@ -79,7 +80,7 @@ module.exports.signin = async function (req, res, next) {
       });
     }
 
-    let user = await User.findOne({ email: email.toLowerCase() });
+    const user = await User.findOne({ email: email.toLowerCase() });
 
     if (!user) {
       return res.status(401).json({
@@ -88,7 +89,6 @@ module.exports.signin = async function (req, res, next) {
       });
     }
 
-    // compare password
     const isMatch = await user.comparePassword(password);
 
     if (!isMatch) {
@@ -100,7 +100,7 @@ module.exports.signin = async function (req, res, next) {
 
     const token = generateToken(user);
 
-    res.status(200).json({
+    return res.status(200).json({
       success: true,
       message: "Sign in successful.",
       token: token,
@@ -114,8 +114,11 @@ module.exports.signin = async function (req, res, next) {
       },
     });
   } catch (error) {
-    console.log(error);
-    next(error);
+    console.log("Signin error:", error);
+    return res.status(500).json({
+      success: false,
+      message: error.message,
+    });
   }
 };
 
